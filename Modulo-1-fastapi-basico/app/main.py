@@ -1,50 +1,94 @@
 from fastapi import FastAPI, HTTPException, Response, status
 from app.schemas import ProductCreate, ProductUpdate, ProductResponse
 
-app = FastAPI(title="API de productos", description ="Una API para gestionar productos", version="1.0.0")
+app = FastAPI(
+    title="Sistema de Inventario",
+    description="API para administrar productos de una tienda",
+    version="1.1.0"
+)
 
-products: list[dict] = []
+inventory: list[dict] = []
+current_id = 1
 
-next_id = 1
+@app.get(
+    "/products",
+    response_model=list[ProductResponse],
+    status_code=status.HTTP_200_OK
+)
+def obtener_productos(min_stock: int = 0):
+    return [item for item in inventory if item["stock"] >= min_stock]
 
-@app.get("/products", response_model=list[ProductResponse], status_code=status.HTTP_200_OK)
-def list_products(min_stock: int = 0) -> list[dict]:
-    return [product for product in products if product["stock"] >= min_stock]
 
-@app.get("/products/{product_id}", response_model=ProductResponse, status_code=status.HTTP_200_OK)
-def get_product(product_id: int) -> dict:
-    for product in products:
-        if product["id"] == product_id:
-            return product
-    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Producto no encontrado")
+@app.get(
+    "/products/{product_id}",
+    response_model=ProductResponse,
+    status_code=status.HTTP_200_OK
+)
+def buscar_producto(product_id: int):
+    for item in inventory:
+        if item["id"] == product_id:
+            return item
 
-@app.post("/products", response_model=ProductResponse, status_code=status.HTTP_201_CREATED)
-def create_product(payload: ProductCreate) -> dict:
-    global next_id
-    product = {
-        "id": next_id,
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="No existe un producto con ese ID"
+    )
+
+
+@app.post(
+    "/products",
+    response_model=ProductResponse,
+    status_code=status.HTTP_201_CREATED
+)
+def registrar_producto(payload: ProductCreate):
+    global current_id
+
+    nuevo_producto = {
+        "id": current_id,
         "name": payload.name,
+        "category": payload.category,
         "price": payload.price,
         "stock": payload.stock
     }
-    products.append(product)
-    next_id += 1
-    return product
 
-@app.put("/products/{product_id}", response_model=ProductResponse, status_code=status.HTTP_200_OK)
-def update_product(product_id: int, payload: ProductUpdate) -> dict:
-    for product in products:
-        if product["id"] == product_id:
-            product["name"] = payload.name
-            product["price"] = payload.price
-            product["stock"] = payload.stock
-            return product
-    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Producto no encontrado")
+    inventory.append(nuevo_producto)
+    current_id += 1
 
-@app.delete("/products/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_product(product_id: int) -> Response:
-    for index, product in enumerate(products):
-        if product["id"] == product_id:
-            del products[index]
+    return nuevo_producto
+
+
+@app.put(
+    "/products/{product_id}",
+    response_model=ProductResponse,
+    status_code=status.HTTP_200_OK
+)
+def actualizar_producto(product_id: int, payload: ProductUpdate):
+    for item in inventory:
+        if item["id"] == product_id:
+            item["name"] = payload.name
+            item["category"] = payload.category
+            item["price"] = payload.price
+            item["stock"] = payload.stock
+
+            return item
+
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="Producto no encontrado"
+    )
+
+
+@app.delete(
+    "/products/{product_id}",
+    status_code=status.HTTP_204_NO_CONTENT
+)
+def eliminar_producto(product_id: int):
+    for index, item in enumerate(inventory):
+        if item["id"] == product_id:
+            del inventory[index]
             return Response(status_code=status.HTTP_204_NO_CONTENT)
-    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Producto no encontrado")
+
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="Producto no encontrado"
+    )
